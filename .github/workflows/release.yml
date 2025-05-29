@@ -1,0 +1,38 @@
+name: release
+
+on:
+    push:
+        branches:
+            - main
+
+env:
+    CI: 1
+    GITHUB_TOKEN: ${{ secrets.PERSONAL_PAT }}
+    PYTHON_VERSION: "3.12"
+
+permissions:
+    contents: write # to be able to publish a GitHub release
+    issues: write # to be able to comment on released issues
+    pull-requests: write # to be able to comment on released pull requests
+    id-token: write # to enable use of OIDC for npm provenance
+    packages: write
+
+jobs:
+    release:
+        runs-on: ubuntu-24.04
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                fetch-depth: 0
+            - name: setup python
+              uses: actions/setup-python@v4
+              with:
+                python-version: ${{ env.PYTHON_VERSION }}
+            - name: install hatch
+              run: pip install hatch
+            - name: release
+              uses: cocogitto/cocogitto-action@main
+              with:
+                release: true
+            - name: print version
+              run: "echo '${{ steps.release.outputs.version }}'"
