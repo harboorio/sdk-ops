@@ -288,10 +288,15 @@ def generate_ast(spec: APISpec, sdk_name: str, dest: str, base_url: str | None):
         class_defs: List[ast.ClassDef] = []
 
         def ast_parse_prop_recursive(
-            name: str, schema: dict[str, Any], prop_default_value: Any = None
+            name: str,
+            schema: dict[str, Any],
+            prop_default_value: Any = None,
+            parent_name: str = None,
         ):
             if schema["type"] == "object":
-                prop_annotation = text_snake_to_pascal_case(f"{root_name}_{name}")
+                prop_annotation = text_snake_to_pascal_case(
+                    f"{parent_name}_{name}" if parent_name else name
+                )
                 ast_class = ast.ClassDef(
                     name=prop_annotation,
                     bases=[],
@@ -328,6 +333,7 @@ def generate_ast(spec: APISpec, sdk_name: str, dest: str, base_url: str | None):
                             name=prop_name,
                             schema=prop,
                             prop_default_value=default_value,
+                            parent_name=name,
                         )
                     )
                     if ast_default_value:
@@ -360,7 +366,7 @@ def generate_ast(spec: APISpec, sdk_name: str, dest: str, base_url: str | None):
             )
             return argument, argument_default_value, assignment
 
-        ast_parse_prop_recursive(root_name, root_schema)
+        ast_parse_prop_recursive(root_name, root_schema, None)
 
         return class_defs
 
