@@ -266,6 +266,7 @@ def generate_ast(spec: APISpec, sdk_name: str, dest: str, base_url: str | None):
     def get_default_value_from_type(key: str):
         default_value_mapping: dict[str, Any] = {
             "str": "",
+            "bool": False,
             "int": 0,
             "float": 0,
             "list": [],
