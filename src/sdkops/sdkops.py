@@ -557,10 +557,14 @@ class {text_snake_to_pascal_case(sdk_name)}:
             )
         else:
             function_return_statement = ast.Return(
-                value=ast.Attribute(
-                    value=ast.Name(id="response", ctx=ast.Load()),
-                    attr="json",
-                    ctx=ast.Load(),
+                value=ast.Call(
+                    func=ast.Attribute(
+                        value=ast.Name(id="response", ctx=ast.Load()),
+                        attr="json",
+                        ctx=ast.Load(),
+                    ),
+                    args=[],
+                    keywords=[],
                 )
             )
         function_body.append(function_return_statement)
