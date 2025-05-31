@@ -309,6 +309,7 @@ def generate_ast(spec: APISpec, sdk_name: str, dest: str, base_url: str | None):
                             body=[],
                             decorator_list=[],
                             returns=None,
+                            lineno=1,
                         )
                     ],
                     type_params=[],
