@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "sdkops"
 dynamic = ["version"]
-description = 'openapi based python sdk generator.'
+description = 'Generates fully typed python SDK modules by reading OpenAPI schemas.'
 readme = "README.md"
 requires-python = ">=3.8"
 license = "MIT"

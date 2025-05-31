@@ -274,49 +274,91 @@ def generate_ast(spec: APISpec, sdk_name: str, dest: str, base_url: str | None):
         return default_value_mapping[key]
 
     def ast_generate_class_from_json_schema(
-        json: dict[str, Any], class_name: str, class_defs: List[ast.ClassDef] = None
+        root_name: str, root_schema: dict[str, Any]
     ):
-        if class_defs is None:
-            class_defs = []
+        """
+        Generates a single class to represent request/response types of endpoints.
+        If the schema contains child objects, they will be converted to a class and added as a type too.
 
-        _type = json["type"]
-        required_props = json["required"] if "required" in json else []
+        :param root_name: initial class name, path operation id
+        :param root_schema: initial json schema
+        :return: class definitions in ast form
+        """
+        class_defs: List[ast.ClassDef] = []
 
-        if _type == "object":
-            properties = []
-            for name, prop in json["properties"].items():
-                is_required = True if name in required_props else False
-                default_value = (
-                    ast.Constant(
-                        value=get_default_value_from_type(
-                            json_schema_to_python_type(prop["type"])
+        def ast_parse_prop_recursive(
+            name: str, schema: dict[str, Any], prop_default_value: Any = None
+        ):
+            if schema["type"] == "object":
+                prop_annotation = text_snake_to_pascal_case(f"{root_name}_{name}")
+                ast_class = ast.ClassDef(
+                    name=prop_annotation,
+                    bases=[],
+                    keywords=[],
+                    decorator_list=[],
+                    body=[
+                        ast.FunctionDef(
+                            name="__init__",
+                            args=ast.arguments(
+                                args=[ast.arg(arg="self", annotation=None)],
+                                defaults=[],
+                                posonlyargs=[],
+                                kwonlyargs=[],
+                            ),
+                            body=[],
+                            decorator_list=[],
+                            returns=None,
+                        )
+                    ],
+                    type_params=[],
+                )
+                required_props = schema["required"] if "required" in schema else []
+                for prop_name, prop in schema["properties"].items():
+                    is_required = True if prop_name in required_props else False
+                    default_value = get_default_value_from_type(
+                        json_schema_to_python_type(prop["type"])
+                    )
+                    ast_default_value = (
+                        ast.Constant(value=default_value) if not is_required else None
+                    )
+                    argument, argument_default_value, assignment = (
+                        ast_parse_prop_recursive(
+                            name=prop_name,
+                            schema=prop,
+                            prop_default_value=default_value,
                         )
                     )
-                    if not is_required
-                    else None
-                )
-                child_class_name = json_schema_to_python_type(prop["type"])
-                if prop["type"] == "object":
-                    child_class_name = text_snake_to_pascal_case(f"{class_name}_{name}")
-                    ast_generate_class_from_json_schema(
-                        prop, f"{class_name}_{name}", class_defs
-                    )
-                assign_ast = ast.AnnAssign(
-                    target=ast.Name(id=name, ctx=ast.Store()),
-                    annotation=ast.Name(id=child_class_name, ctx=ast.Load()),
-                    simple=1,
-                    value=default_value,
-                )
-                properties.append(assign_ast)
-            class_def = ast.ClassDef(
-                name=text_snake_to_pascal_case(class_name),
-                bases=[],
-                keywords=[],
-                body=properties,
-                decorator_list=[],
-                type_params=[],
+                    if ast_default_value:
+                        ast_class.body[0].args.args.append(argument)
+                        ast_class.body[0].args.defaults.append(argument_default_value)
+                    else:
+                        ast_class.body[0].args.args.insert(1, argument)
+                    ast_class.body[0].body.append(assignment)
+                class_defs.append(ast_class)
+            else:
+                prop_annotation = json_schema_to_python_type(schema["type"])
+
+            argument = ast.arg(
+                arg=name, annotation=ast.Name(id=prop_annotation, ctx=ast.Load())
             )
-            class_defs.append(class_def)
+            argument_default_value = (
+                ast.Constant(value=prop_default_value)
+                if prop_default_value is not None
+                else None
+            )
+            assignment = ast.AnnAssign(
+                target=ast.Attribute(
+                    value=ast.Name(id="self", ctx=ast.Load()),
+                    attr=name,
+                    ctx=ast.Store(),
+                ),
+                annotation=ast.Name(id=prop_annotation, ctx=ast.Load()),
+                value=ast.Name(id=name, ctx=ast.Load()),
+                simple=1,
+            )
+            return argument, argument_default_value, assignment
+
+        ast_parse_prop_recursive(root_name, root_schema)
 
         return class_defs
 
@@ -324,17 +366,22 @@ def generate_ast(spec: APISpec, sdk_name: str, dest: str, base_url: str | None):
         return ast.parse(
             source=f"""
 class {text_snake_to_pascal_case(sdk_name)}:
-    client = httpx.Client(
-        base_url="{base_url}",
-        headers={{'user-agent': '{sdk_name}', 'accept': 'application/json'}},
-        timeout=10,
+    def __init__(self):
+        self.client = httpx.Client(
+            base_url="{base_url}",
+            headers={{'user-agent': '{sdk_name}', 'accept': 'application/json'}},
+            timeout=10,
     )
 
+    def auth(self, scheme: str, value: str):
+        self.client.headers['authorization'] = f"{{scheme}} {{value}}"
+
+    def deauth(self):
+        self.client.headers.pop('authorization', None)
 
     def _cleanup(self):
         if not self.client.is_closed:
             self.client.close()
-
 
     def _send_request(self, request: httpx.Request) -> httpx.Response:
         try:
@@ -347,50 +394,93 @@ class {text_snake_to_pascal_case(sdk_name)}:
         )
 
     def ast_generate_class_method(pattern: str, operation: APISpecPathOperation):
-        args = [ast.arg(arg="self", annotation=None)]
-        args_defaults = []
-        request_call_keywords = []
+        """
+        Generates fully-typed function definitions to add to the generated sdk class.
 
+        :param pattern: URL parh
+        :param operation: APISpecPathOperation object
+        :return: Ast node of a function definition
+        """
+
+        # function name is the snake cased operation_id
+        function_name = operation.operation_id
+
+        # function should return either combination of pascal cased content ids or str
+        function_return_types: list[str] = []
+        for response in operation.responses:
+            for content in response.contents:
+                if "json" in content.media_type:
+                    function_return_types.append(
+                        text_snake_to_pascal_case(content.get_id())
+                    )
+                elif "text/plain" in content.media_type:
+                    function_return_types.append("str")
+        does_function_return_str = True if "str" in function_return_types else False
+
+        # collect fully-typed function arguments
+        function_arguments = [ast.arg(arg="self", annotation=None)]
+        function_arguments_defaults = []
+        # json from request body
         if operation.request_body:
             for content in operation.request_body.contents:
                 if "json" in content.media_type:
                     py_type = text_snake_to_pascal_case(content.get_id())
-                    args.append(
+                    function_arguments.append(
                         ast.arg(
                             arg="json", annotation=ast.Name(id=py_type, ctx=ast.Load())
                         )
                     )
-                    request_call_keywords.append(
-                        ast.keyword(
-                            arg="json", value=ast.Name(id="json", ctx=ast.Load())
-                        )
-                    )
-
+        # path and query parameters from parameters
         for parameter in operation.parameters:
             if parameter.kind == "path" or parameter.kind == "query":
                 py_type = json_schema_to_python_type(parameter.schema["type"])
-                if "default" in parameter.schema:
-                    args_defaults.append(
-                        ast.Constant(value=parameter.schema["default"])
-                    )
-                elif parameter.required:
-                    args_defaults.append(
-                        ast.Constant(value=get_default_value_from_type(py_type))
-                    )
-                # default_value = get_default_value_from_type(py_type) if parameter.required else None
-                # default_value = parameter.schema['default'] if 'default' in parameter.schema else default_value
-                # if default_value:
-                #    args_defaults.append(default_value)
-                args.append(
+                function_arguments.append(
                     ast.arg(
                         arg=parameter.name,
                         annotation=ast.Name(id=py_type, ctx=ast.Load()),
                     )
                 )
+                _value = (
+                    parameter.schema["default"]
+                    if "default" in parameter.schema
+                    else get_default_value_from_type(py_type)
+                )
+                function_arguments_defaults.append(ast.Constant(value=_value))
+        # headers argument for extra, endpoint specific headers
+        function_arguments.append(
+            ast.arg(
+                arg="headers",
+                annotation=ast.Name(id="dict[str, str]", ctx=ast.Load()),
+            )
+        )
+        function_arguments_defaults.append(ast.Constant(value=None))
 
+        # create function body
+        function_body = []
+        if does_function_return_str:
+            # set accept header to plain text for text kind responses
+            function_body.append(
+                ast.parse("self.client.headers['accept'] = 'text/plain'")
+            )
+        # apply endpoint specific headers if specified
+        function_body.append(
+            ast.parse(
+                "headers_combined = self.client.headers if headers is None else {**self.client.headers, **headers}"
+            )
+        )
+        # build request call
+        build_request_keywords = []
+        if operation.request_body:
+            for content in operation.request_body.contents:
+                if "json" in content.media_type:
+                    build_request_keywords.append(
+                        ast.keyword(
+                            arg="json", value=ast.Name(id="json", ctx=ast.Load())
+                        )
+                    )
         query_params = [x.name for x in operation.parameters if x.kind == "query"]
-        if query_params:
-            request_call_keywords.append(
+        if len(query_params) > 0:
+            build_request_keywords.append(
                 ast.keyword(
                     arg="params",
                     value=ast.Dict(
@@ -402,31 +492,40 @@ class {text_snake_to_pascal_case(sdk_name)}:
                     ),
                 )
             )
-
-        request_call_func_def = ast.Attribute(
+        build_request_keywords.append(
+            ast.keyword(
+                arg="headers", value=ast.Name(id="headers_combined", ctx=ast.Load())
+            )
+        )
+        build_request_arguments = [
+            # request method
+            ast.Constant(value=operation.method),
+            # either simply a url path or parameterized path pattern
+            (
+                ast.parse('f"' + pattern + '"')
+                if len(re.findall(r"\{([^}]+)\}", pattern)) > 0
+                else ast.Constant(value=pattern)
+            ),
+        ]
+        build_request_call = ast.Attribute(
             value=ast.Attribute(
                 value=ast.Name(id="self", ctx=ast.Load()), attr="client", ctx=ast.Load()
             ),
             attr="build_request",
             ctx=ast.Load(),
         )
-        path_params = re.findall(r"\{([^}]+)\}", pattern)
-        url_arg = (
-            ast.parse('f"' + pattern + '"')
-            if len(path_params) > 0
-            else ast.Constant(value=pattern)
-        )
-
-        request_call = ast.Assign(
+        request_var = ast.Assign(
             targets=[ast.Name(id="request", ctx=ast.Store())],
             value=ast.Call(
-                func=request_call_func_def,
-                args=[ast.Constant(value=operation.method), url_arg],
-                keywords=request_call_keywords,
+                func=build_request_call,
+                args=build_request_arguments,
+                keywords=build_request_keywords,
             ),
             lineno=1,
         )
-        response_call = ast.Assign(
+        function_body.append(request_var)
+        # send request call
+        response_var = ast.Assign(
             targets=[ast.Name(id="response", ctx=ast.Store())],
             value=ast.Call(
                 func=ast.Attribute(
@@ -439,37 +538,38 @@ class {text_snake_to_pascal_case(sdk_name)}:
             ),
             lineno=1,
         )
-        response_type = []
-        has_plain_text_response = False
-        for response in operation.responses:
-            for content in response.contents:
-                if "json" in content.media_type:
-                    response_type.append(text_snake_to_pascal_case(content.get_id()))
-                elif "text/plain" in content.media_type:
-                    has_plain_text_response = True
-                    response_type.append("str")
-        response_attr = ast.Attribute(
-            value=ast.Name(id="response", ctx=ast.Load()),
-            attr="json" if has_plain_text_response is False else "text",
-            ctx=ast.Load(),
-        )
-        if has_plain_text_response:
-            return_call = ast.Return(value=response_attr)
-        else:
-            return_call = ast.Return(
-                value=ast.Call(func=response_attr, args=[], keywords=[])
+        function_body.append(response_var)
+        if does_function_return_str:
+            function_return_statement = ast.Return(
+                value=ast.Attribute(
+                    value=ast.Name(id="response", ctx=ast.Load()),
+                    attr="text",
+                    ctx=ast.Load(),
+                )
             )
+        else:
+            function_return_statement = ast.Return(
+                value=ast.Attribute(
+                    value=ast.Name(id="response", ctx=ast.Load()),
+                    attr="json",
+                    ctx=ast.Load(),
+                )
+            )
+        function_body.append(function_return_statement)
 
         return ast.FunctionDef(
-            name=operation.operation_id,
+            name=function_name,
             args=ast.arguments(
-                args=args, defaults=args_defaults, posonlyargs=[], kwonlyargs=[]
+                args=function_arguments,
+                defaults=function_arguments_defaults,
+                posonlyargs=[],
+                kwonlyargs=[],
             ),
-            body=[request_call, response_call, return_call],
+            body=function_body,
             decorator_list=[],
             returns=(
-                ast.Name(id=" | ".join(response_type), ctx=ast.Load())
-                if len(response_type) > 0
+                ast.Name(id=" | ".join(function_return_types), ctx=ast.Load())
+                if len(function_return_types) > 0
                 else None
             ),
             lineno=1,
@@ -487,7 +587,7 @@ class {text_snake_to_pascal_case(sdk_name)}:
                 for content in operation.request_body.contents:
                     if content.schema:
                         _class_defs = ast_generate_class_from_json_schema(
-                            content.schema, content.get_id()
+                            content.get_id(), content.schema
                         )
                         __class_defs = [
                             _class_def
@@ -501,7 +601,7 @@ class {text_snake_to_pascal_case(sdk_name)}:
                 for content in response.contents:
                     if content.schema:
                         _class_defs = ast_generate_class_from_json_schema(
-                            content.schema, content.get_id()
+                            content.get_id(), content.schema
                         )
                         __class_defs = [
                             _class_def
