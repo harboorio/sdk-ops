@@ -8,7 +8,10 @@ import tempfile
 import os
 import sys
 import json
-from sdkops import sdkops
+import ast
+import black
+from sdkops.openapi import parse
+from sdkops.generator import to_ast
 
 
 @click.command("generate", short_help="generates a python sdk from openapi schema.")
@@ -23,7 +26,7 @@ from sdkops import sdkops
 )
 def generate(file: str, name: str, dest: str, url: str = None):
     """
-    file is an open api schema file path or a url endpoint to fetch the schema.
+    FILE is an open api schema file path or a url endpoint to fetch the schema.
     """
     click.echo("verifying sdk package name...")
     if not all(char in set("abcdefghijklmnopqrstuvwxyz0123456789_") for char in name):
@@ -66,7 +69,7 @@ def generate(file: str, name: str, dest: str, url: str = None):
     click.echo("verifying openapi schema file... done.")
 
     click.echo("parsing schema...")
-    success, spec = sdkops.parse(schema_dict)
+    success, spec = parse(schema_dict)
     if not success:
         click.echo(f"parsing schema... failed. {spec}")
         sys.exit(1)
@@ -92,18 +95,24 @@ def generate(file: str, name: str, dest: str, url: str = None):
     rich.print(tree)
 
     click.echo("finding out the base url...")
-    success, message, verified_base_url = sdkops.find_base_url(base_url=url, spec=spec)
+    success, message, verified_base_url = spec.find_base_url(
+        base_url=url, servers=spec.servers
+    )
     if not success:
         click.echo(f"finding out the base url... failed. {message}")
         sys.exit(1)
     click.echo("finding out the base url... done.")
 
     click.echo("generating ast...")
-    success, message = sdkops.generate_ast(spec, name, dest, base_url=verified_base_url)
-    if not success:
-        click.echo(f"generating ast... failed. {message}")
-        sys.exit(1)
+    root = to_ast(spec, name, base_url=verified_base_url)
     click.echo("generating ast... done.")
+
+    click.echo("saving ast output...")
+    code = ast.unparse(root)
+    code_formatted = black.format_str(code, mode=black.FileMode())
+    with open(os.path.join(dest, f"{name}.py"), "w") as f:
+        f.write(code_formatted)
+    click.echo("saving ast output... done.")
 
     click.echo("cleaning up...")
     if temp_file is not None:

@@ -99,6 +99,120 @@
         }
       }
     },
+    "/user/status": {
+      "get": {
+        "tags": [
+          "user"
+        ],
+        "summary": "User Status",
+        "operationId": "user_status",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserStatusResponseBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/project/list": {
+      "get": {
+        "tags": [
+          "project"
+        ],
+        "summary": "Project List",
+        "operationId": "project_list",
+        "parameters": [
+          {
+            "name": "cwd_hash",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 64,
+                  "maxLength": 64
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cwd Hash"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectListResponseBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/project/{name}": {
+      "get": {
+        "tags": [
+          "project"
+        ],
+        "summary": "Project Get",
+        "operationId": "project_get",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectGetResponseBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/": {
       "get": {
         "summary": "Home",
@@ -197,6 +311,99 @@
           "token"
         ],
         "title": "OtpEmailVerifyResponseBody"
+      },
+      "Project": {
+        "properties": {
+          "rid": {
+            "type": "string",
+            "title": "Rid"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "git_repo_url": {
+            "type": "string",
+            "title": "Git Repo Url"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "removed_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Removed At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rid",
+          "name",
+          "git_repo_url",
+          "updated_at",
+          "removed_at"
+        ],
+        "title": "Project"
+      },
+      "ProjectGetResponseBody": {
+        "properties": {
+          "project": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Project"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "project"
+        ],
+        "title": "ProjectGetResponseBody"
+      },
+      "ProjectListResponseBody": {
+        "properties": {
+          "projects": {
+            "items": {
+              "$ref": "#/components/schemas/Project"
+            },
+            "type": "array",
+            "title": "Projects"
+          }
+        },
+        "type": "object",
+        "required": [
+          "projects"
+        ],
+        "title": "ProjectListResponseBody"
+      },
+      "UserStatusResponseBody": {
+        "properties": {
+          "authenticated": {
+            "type": "boolean",
+            "title": "Authenticated"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          }
+        },
+        "type": "object",
+        "required": [
+          "authenticated",
+          "email"
+        ],
+        "title": "UserStatusResponseBody"
       },
       "ValidationError": {
         "type": "object",
