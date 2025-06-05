@@ -2,6 +2,17 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [0.1.1](https://github.com/harboorio/sdk-ops/compare/c650fb412ad876d0673072cde51a4091adae2d19..0.1.1) - 2025-06-05
+#### Bug Fixes
+- schema handling - ([38150fa](https://github.com/harboorio/sdk-ops/commit/38150fa23e36e91abb97973c8e5bc3eae688731d)) - Murat Gözel
+- method return json call - ([555198a](https://github.com/harboorio/sdk-ops/commit/555198a0777fd845b84f33f15951dbe8a8ad392a)) - Murat Gözel
+- class naming - ([767f590](https://github.com/harboorio/sdk-ops/commit/767f590948b2bc2ce1083e4ff2688f91da27cb2b)) - Murat Gözel
+- function definition - ([7e0efa6](https://github.com/harboorio/sdk-ops/commit/7e0efa67e066532f3416573a231f09206f7dd283)) - Murat Gözel
+- default value for the bool type - ([5d4765b](https://github.com/harboorio/sdk-ops/commit/5d4765b1375a70645573a96e5c6d2397bdbcced0)) - Murat Gözel
+- generation of type classes - ([c650fb4](https://github.com/harboorio/sdk-ops/commit/c650fb412ad876d0673072cde51a4091adae2d19)) - Murat Gözel
+
+- - -
+
 ## [0.1.0](https://github.com/harboorio/sdk-ops/compare/715b443b7be2a687a9bbf66326ef75de9f7ecc73..0.1.0) - 2025-05-29
 #### Features
 - initial commit - ([715b443](https://github.com/harboorio/sdk-ops/commit/715b443b7be2a687a9bbf66326ef75de9f7ecc73)) - Murat Gözel
