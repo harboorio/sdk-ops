@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [0.1.5](https://github.com/harboorio/sdk-ops/compare/e48de3a81038aef39a93789ab526709e3a542541..0.1.5) - 2025-06-07
+#### Bug Fixes
+- ref resolving in anyOf - ([e48de3a](https://github.com/harboorio/sdk-ops/commit/e48de3a81038aef39a93789ab526709e3a542541)) - Murat Gözel
+
+- - -
+
 ## [0.1.4](https://github.com/harboorio/sdk-ops/compare/e4ef44c727bf3085f5111a8b5b49aa2a5f6dbc3d..0.1.4) - 2025-06-07
 #### Bug Fixes
 - class name generation - ([e4ef44c](https://github.com/harboorio/sdk-ops/commit/e4ef44c727bf3085f5111a8b5b49aa2a5f6dbc3d)) - Murat Gözel
