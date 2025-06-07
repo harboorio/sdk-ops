@@ -344,3 +344,41 @@ class ItemWithRef(dict):
         self.order: ItemWithRefOrder = order
 """
     )
+
+    schema2 = {
+        "type": "object",
+        "properties": {
+            "version": {"type": "string"},
+            "customer": {"$ref": "#/components/schemas/customer"},
+        },
+        "required": ["version", "customer"],
+        "components": {
+            "schemas": {
+                "customer": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"type": "integer"},
+                    },
+                }
+            }
+        },
+    }
+    ast2 = json_schema.to_ast("ref", schema2)
+    assert (
+        black.format_str(ast.unparse(ast2), mode=black.FileMode(line_length=160))
+        == """\
+class RefCustomer(dict):
+
+    def __init__(self, id: int = 0):
+        super().__init__(id=id)
+        self.id: int = id
+
+
+class Ref(dict):
+
+    def __init__(self, customer: RefCustomer, version: str):
+        super().__init__(version=version, customer=customer)
+        self.version: str = version
+        self.customer: RefCustomer = customer
+"""
+    )

@@ -21,8 +21,10 @@ def to_ast(root_name: str, root_schema: dict[str, Any]):
 
         is_ref = False
         ref_name = None
+        is_ref_on_path = False
         if "$ref" in schema:
             is_ref = True
+            is_ref_on_path = schema["$ref"].startswith("#/properties")
             ref_name = schema_generate_name_by_ref(root_schema, schema["$ref"])
             schema, _trace = schema_resolve_ref(root_schema, schema["$ref"])
             if schema is None:
@@ -133,7 +135,9 @@ def to_ast(root_name: str, root_schema: dict[str, Any]):
                 )
 
         elif schema["type"] == "object":
-            if is_ref is False or (is_ref is True and ast_class is None):
+            if is_ref is False or (
+                is_ref is True and (ast_class is None or is_ref_on_path is False)
+            ):
                 class_name = case_snake_to_pascal("_".join(name_chain))
                 new_class = ast_create_class(class_name)
                 required_props = schema["required"] if "required" in schema else []
@@ -145,9 +149,7 @@ def to_ast(root_name: str, root_schema: dict[str, Any]):
                         new_class,
                         is_required=_is_required,
                     )
-                if ast_class is None:
-                    pass
-                else:
+                if is_ref is False and ast_class is not None:
                     has_default_value = False if is_required is True else True
                     ast_class_add_init_argument(
                         ast_class, prop_name, class_name, has_default_value, None

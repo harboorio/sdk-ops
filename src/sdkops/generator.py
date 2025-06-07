@@ -27,7 +27,6 @@ def to_ast(spec: APISpec, sdk_name: str, base_url: str | None):
                             **content.schema,
                             **{"components": spec.schema_dict["components"]},
                         }
-                        print(f"content id: {content.get_id()}")
                         class_defs = schema_to_ast(
                             f"{sdk_name}_{content.get_id()}", combined_schema
                         )
