@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [0.1.2](https://github.com/harboorio/sdk-ops/compare/d8729494540e4888bfa6e694656bad2bfd5ca707..0.1.2) - 2025-06-07
+#### Bug Fixes
+- referenced schema generation - ([d872949](https://github.com/harboorio/sdk-ops/commit/d8729494540e4888bfa6e694656bad2bfd5ca707)) - Murat Gözel
+
+- - -
+
 ## [0.1.1](https://github.com/harboorio/sdk-ops/compare/c650fb412ad876d0673072cde51a4091adae2d19..0.1.1) - 2025-06-05
 #### Bug Fixes
 - schema handling - ([38150fa](https://github.com/harboorio/sdk-ops/commit/38150fa23e36e91abb97973c8e5bc3eae688731d)) - Murat Gözel
