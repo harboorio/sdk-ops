@@ -382,3 +382,56 @@ class Ref(dict):
         self.customer: RefCustomer = customer
 """
     )
+
+    schema3 = {
+        "type": "object",
+        "properties": {
+            "customer": {"$ref": "#/components/schemas/CustomerInfo"},
+            "order": {"$ref": "#/components/schemas/OrderInfo"},
+        },
+        "required": ["customer", "order"],
+        "components": {
+            "schemas": {
+                "CustomerInfo": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"type": "integer"},
+                    },
+                    "required": ["id"],
+                },
+                "OrderInfo": {
+                    "type": "object",
+                    "properties": {
+                        "no": {"type": "string"},
+                    },
+                    "required": ["no"],
+                },
+            }
+        },
+    }
+    ast3 = json_schema.to_ast("ref", schema3)
+    assert (
+        black.format_str(ast.unparse(ast3), mode=black.FileMode(line_length=160))
+        == """\
+class RefCustomerInfo(dict):
+
+    def __init__(self, id: int):
+        super().__init__(id=id)
+        self.id: int = id
+
+
+class RefOrderInfo(dict):
+
+    def __init__(self, no: str):
+        super().__init__(no=no)
+        self.no: str = no
+
+
+class Ref(dict):
+
+    def __init__(self, order: RefOrderInfo, customer: RefCustomerInfo):
+        super().__init__(customer=customer, order=order)
+        self.customer: RefCustomerInfo = customer
+        self.order: RefOrderInfo = order
+"""
+    )

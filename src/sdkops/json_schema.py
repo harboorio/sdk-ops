@@ -138,7 +138,11 @@ def to_ast(root_name: str, root_schema: dict[str, Any]):
             if is_ref is False or (
                 is_ref is True and (ast_class is None or is_ref_on_path is False)
             ):
-                class_name = case_snake_to_pascal("_".join(name_chain))
+                class_name = case_snake_to_pascal(
+                    "_".join(name_chain)
+                    if is_ref is False
+                    else f"{root_name}_{ref_name}"
+                )
                 new_class = ast_create_class(class_name)
                 required_props = schema["required"] if "required" in schema else []
                 for child_prop_name, child_schema in schema["properties"].items():
@@ -457,4 +461,4 @@ def case_snake_to_pascal(text: str) -> str:
     components = [comp for comp in text.split("_") if comp]
     if not components:
         return text
-    return "".join(word.capitalize() for word in components)
+    return "".join(word[0].upper() + word[1:] if word else word for word in components)
