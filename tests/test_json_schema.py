@@ -435,3 +435,45 @@ class Ref(dict):
         self.order: RefOrderInfo = order
 """
     )
+
+    schema4 = {
+        "type": "object",
+        "properties": {
+            "point": {
+                "anyOf": [
+                    {"$ref": "#/components/schemas/MapPoint"},
+                    {"type": "null"},
+                    {"$ref": "#/components/schemas/IntPoint"},
+                ]
+            }
+        },
+        "components": {
+            "schemas": {
+                "MapPoint": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"type": "integer"},
+                    },
+                },
+                "IntPoint": {"type": "integer"},
+            }
+        },
+    }
+    ast4 = json_schema.to_ast("me", schema4)
+    assert (
+        black.format_str(ast.unparse(ast4), mode=black.FileMode(line_length=160))
+        == """\
+class MePoint(dict):
+
+    def __init__(self, id: int = 0):
+        super().__init__(id=id)
+        self.id: int = id
+
+
+class Me(dict):
+
+    def __init__(self, point: MePoint | None | int = None):
+        super().__init__(point=point)
+        self.point: MePoint | None | int = point
+"""
+    )

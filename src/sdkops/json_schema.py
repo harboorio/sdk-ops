@@ -11,6 +11,19 @@ def to_ast(root_name: str, root_schema: dict[str, Any]):
     ref_name_cache = {}
     class_defs: list[ast.ClassDef] = []
 
+    def process_ref(input_schema: dict[str, Any]):
+        is_ref = False
+        ref_name = None
+        is_ref_on_path = False
+        if "$ref" in input_schema:
+            is_ref = True
+            is_ref_on_path = input_schema["$ref"].startswith("#/properties")
+            ref_name = schema_generate_name_by_ref(root_schema, input_schema["$ref"])
+            input_schema, _trace = schema_resolve_ref(root_schema, input_schema["$ref"])
+            if input_schema is None:
+                raise ValueError(f"failed to resolve ref. {_trace}")
+        return input_schema, is_ref, ref_name, is_ref_on_path
+
     def to_ast_recursive(
         name_chain: tuple[str],
         schema: dict[str, Any],
@@ -19,21 +32,15 @@ def to_ast(root_name: str, root_schema: dict[str, Any]):
     ):
         prop_name = name_chain[-1]
 
-        is_ref = False
-        ref_name = None
-        is_ref_on_path = False
-        if "$ref" in schema:
-            is_ref = True
-            is_ref_on_path = schema["$ref"].startswith("#/properties")
-            ref_name = schema_generate_name_by_ref(root_schema, schema["$ref"])
-            schema, _trace = schema_resolve_ref(root_schema, schema["$ref"])
-            if schema is None:
-                raise ValueError(f"failed to resolve ref. {_trace}")
+        schema, is_ref, ref_name, is_ref_on_path = process_ref(schema)
 
         if "anyOf" in schema:
             all_types = []
             object_count = 0
             for child_schema in schema["anyOf"]:
+                child_schema, is_ref, ref_name, is_ref_on_path = process_ref(
+                    child_schema
+                )
                 if "type" in child_schema and child_schema["type"] == "object":
                     class_name = case_snake_to_pascal("_".join(name_chain)) + (
                         str(object_count + 1) if object_count > 0 else ""
