@@ -140,7 +140,7 @@ def to_ast(root_name: str, root_schema: dict[str, Any]):
             ):
                 class_name = case_snake_to_pascal(
                     "_".join(name_chain)
-                    if is_ref is False
+                    if is_ref is False or (is_ref is True and ast_class is None)
                     else f"{root_name}_{ref_name}"
                 )
                 new_class = ast_create_class(class_name)
